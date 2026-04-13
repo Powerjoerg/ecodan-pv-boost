@@ -562,7 +562,34 @@ COP Heute = Wärme Heute (kWh) / Strom Heute (kWh)
 - Trigger feuert nur beim **Übergang** von ≤ 5 Hz auf > 5 Hz
 
 ---
+## ## Roadmap — Geplante Erweiterungen
 
+### 🔜 Smart Meter / TRuDi Integration
+- Digitaler Stromzähler mit TRuDi-Anbindung für offizielle Verbrauchsdaten
+- Exakte Messung von Netzbezug, Einspeisung und Eigenverbrauch
+- Ablösung / Ergänzung der Shelly Pro 3EM Verbrauchsmessung
+
+### 🔜 Flexibler Stromtarif (dynamisch)
+- Anbindung an dynamische Stromtarife (z.B. Tibber, aWATTar, Octopus Energy)
+- WP-Betrieb bevorzugt in günstigen Stunden
+- TWW-Aufheizung in Niedrigpreis-Fenster verschieben
+- Kombination mit PV-Boost: PV-Überschuss hat Vorrang, danach günstigster Tarif
+
+### 🔜 Batterie-Management Optimierung (FoxESS)
+- Intelligentes Laden/Entladen basierend auf Strompreis
+- Batterie laden wenn Strom günstig, entladen wenn teuer
+- Koordination mit WP-Betrieb: WP aus Batterie versorgen wenn kein PV und Strom teuer
+- Eigenverbrauchsoptimierung über den gesamten Tag
+
+### 🔜 Feintuning Heizkurve & Taktungsoptimierung
+- Auswertung der Monitoring-Daten (Kurzzyklen-Erkennung läuft bereits)
+- Automatische Anpassung der Heizfreigabe basierend auf Außentemperatur
+- Mindest-Laufzeiten und Mindest-Pausenzeiten für den Kompressor
+- Saisonale Profile (Übergangszeit vs. Winter)
+
+> **Status:** Diese Features sind in Planung und werden nach und nach ergänzt. Beiträge und Ideen sind willkommen — einfach ein [Issue](https://github.com/Powerjoerg/ecodan-pv-boost/issues) erstellen!
+
+---
 ## Danksagung
 
 - **[helgeklein](https://github.com/helgeklein/mitsubishi-heat-pump-modbus-home-assistant)** — Für das hervorragende Modbus-Package für Mitsubishi Wärmepumpen
