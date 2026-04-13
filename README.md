@@ -27,6 +27,7 @@ Automatische PV-Überschuss-Steuerung für Mitsubishi Ecodan Wärmepumpen mit Ho
 - [Taktungsbewertung](#taktungsbewertung)
 - [COP-Berechnung](#cop-berechnung)
 - [Fehlerbehebung](#fehlerbehebung)
+- [Roadmap — Geplante Erweiterungen](#roadmap--geplante-erweiterungen)
 - [Danksagung](#danksagung)
 - [Lizenz](#lizenz)
 
