@@ -1,3 +1,33 @@
+# ==========================================
+# WEIHNACHTSBELEUCHTUNG
+# ==========================================
+- id: weihnachtsbeleuchtung_17_an
+  alias: Weihnachtsbeleuchtung 17 Uhr AN
+  triggers:
+  - at: '17:00:00'
+    trigger: time
+  conditions: []
+  actions:
+  - target:
+      entity_id: group.weihnachtsbeleuchtung
+    action: homeassistant.turn_on
+  mode: single
+
+- id: weihnachtsbeleuchtung_22_aus
+  alias: Weihnachtsbeleuchtung 22 Uhr AUS
+  triggers:
+  - at: '22:00:00'
+    trigger: time
+  conditions: []
+  actions:
+  - target:
+      entity_id: group.weihnachtsbeleuchtung
+    action: homeassistant.turn_off
+  mode: single
+
+# ==========================================
+# WP TAKTUNG & MONITORING
+# ==========================================
 - id: wp_taktung_zaehlen
   alias: WP Taktung - Start zählen
   description: Zählt jeden WP-Start wenn Verdichter über 5 Hz geht
@@ -13,6 +43,7 @@
       entity_id: counter.wp_starts_heute
     action: counter.increment
   mode: single
+
 - id: wp_taktung_reset
   alias: WP Taktung - Reset Mitternacht
   description: Setzt den WP-Start-Zähler jeden Tag um Mitternacht zurück
@@ -25,9 +56,13 @@
       entity_id: counter.wp_starts_heute
     action: counter.reset
   mode: single
+
+# ==========================================
+# WP PV-BOOST LOGIK
+# ==========================================
 - id: wp_boost_aktivieren
   alias: WP Boost bei PV-Überschuss aktivieren
-  description: Boost auf 60°C wenn WP läuft und PV > 1 kW und Batterie > 70%
+  description: Boost auf 60°C wenn WP bereits läuft und PV > 1 kW und Batterie > 50%
   triggers:
   - entity_id: sensor.mitsubishi_wp_warmepumpe_frequenz
     above: 5
@@ -40,10 +75,7 @@
     above: 1
   - condition: numeric_state
     entity_id: sensor.battery_soc_1
-    above: 70
-  - condition: numeric_state
-    entity_id: sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww
-    below: 48
+    above: 50
   - condition: state
     entity_id: input_boolean.wp_boost_aktiv
     state: 'off'
@@ -74,19 +106,15 @@
         Speicher: {{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') }}°C.
         Soll auf 60°C gesetzt.
   mode: single
+
 - id: wp_boost_beenden
-  alias: WP Boost beenden - Normal-Modus
-  description: Zurück auf 50°C wenn PV oder Batterie zu niedrig
+  alias: WP Boost beenden - PV weg oder Tagesende
+  description: Soll zurück auf 50°C wenn PV zu niedrig oder 21 Uhr
   triggers:
   - entity_id: sensor.pv_power
     below: 0.8
     for:
       minutes: 5
-    trigger: numeric_state
-  - entity_id: sensor.battery_soc_1
-    below: 65
-    for:
-      minutes: 2
     trigger: numeric_state
   - at: '21:00:00'
     trigger: time
@@ -95,9 +123,6 @@
     entity_id: input_boolean.wp_boost_aktiv
     state: 'on'
   actions:
-  - target:
-      entity_id: input_boolean.wp_boost_aktiv
-    action: input_boolean.turn_off
   - action: modbus.write_register
     data:
       hub: mitsubishi-a1m
@@ -109,17 +134,20 @@
     data:
       value: 50
     action: input_number.set_value
+  - target:
+      entity_id: input_boolean.wp_boost_aktiv
+    action: input_boolean.turn_off
   - action: notify.persistent_notification
     data:
-      title: WP Normal-Modus
+      title: WP Boost beendet
       message: >
-        Boost beendet. PV: {{ states('sensor.pv_power') | float(0) | round(1) }} kW.
-        Batterie: {{ states('sensor.battery_soc_1') | int }}%.
-        Soll zurück auf 50°C.
+        PV zu niedrig oder Tagesende. Soll zurück auf 50°C.
+        Speicher: {{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') }}°C.
   mode: single
+
 - id: wp_boost_ziel_erreicht
   alias: WP Boost - Zieltemperatur erreicht
-  description: Soll zurück auf 50°C wenn Speicher 59°C erreicht hat
+  description: TWW über 59°C - Soll zurück auf 50°C
   triggers:
   - entity_id: sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww
     above: 59
@@ -129,9 +157,6 @@
     entity_id: input_boolean.wp_boost_aktiv
     state: 'on'
   actions:
-  - target:
-      entity_id: input_boolean.wp_boost_aktiv
-    action: input_boolean.turn_off
   - action: modbus.write_register
     data:
       hub: mitsubishi-a1m
@@ -143,19 +168,23 @@
     data:
       value: 50
     action: input_number.set_value
+  - target:
+      entity_id: input_boolean.wp_boost_aktiv
+    action: input_boolean.turn_off
   - action: notify.persistent_notification
     data:
-      title: WP Boost abgeschlossen
+      title: WP Boost Ziel erreicht
       message: >
-        Speicher hat 59°C erreicht. Soll zurück auf 50°C.
-        Nächster WP-Start erst bei ~43°C.
+        Speicher bei {{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') }}°C.
+        Soll zurück auf 50°C.
   mode: single
+
 - id: wp_boost_wp_gestoppt
-  alias: WP Boost - WP gestoppt
-  description: Boost beenden wenn WP 5 Min stoppt
+  alias: WP Boost - WP hat gestoppt
+  description: Kompressor gestoppt während Boost - Soll sofort zurück auf 50°C
   triggers:
   - entity_id: sensor.mitsubishi_wp_warmepumpe_frequenz
-    below: 2
+    below: 1
     for:
       minutes: 5
     trigger: numeric_state
@@ -164,9 +193,6 @@
     entity_id: input_boolean.wp_boost_aktiv
     state: 'on'
   actions:
-  - target:
-      entity_id: input_boolean.wp_boost_aktiv
-    action: input_boolean.turn_off
   - action: modbus.write_register
     data:
       hub: mitsubishi-a1m
@@ -178,6 +204,9 @@
     data:
       value: 50
     action: input_number.set_value
+  - target:
+      entity_id: input_boolean.wp_boost_aktiv
+    action: input_boolean.turn_off
   - action: notify.persistent_notification
     data:
       title: WP Boost - WP gestoppt
@@ -185,6 +214,7 @@
         WP hat gestoppt bei {{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') }}°C.
         Soll zurück auf 50°C.
   mode: single
+
 - id: wp_soll_manuell
   alias: WP Soll-Temperatur manuell setzen
   description: Schreibt Soll-Temp auf WP wenn Slider geändert wird
@@ -200,14 +230,23 @@
       address: 30
       value: "{{ states('input_number.wp_soll_temperatur') | int * 100 }}"
   mode: single
+
+# ==========================================
+# WP THERMOSTAT STEUERUNG (IN1)
+# ==========================================
 - id: wp_thermostat_heizbedarf_an
   alias: WP Thermostat - Heizbedarf AN
-  description: Shelly ON wenn mindestens ein Raum unter Soll
+  description: Shelly ON wenn Raum unter Soll UND TWW über 40°C
   triggers:
   - entity_id: sensor.wp_heizbedarf
     to: 'True'
+    for:
+      minutes: 1
     trigger: state
-  conditions: []
+  conditions:
+  - condition: numeric_state
+    entity_id: sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww
+    above: 40
   actions:
   - target:
       entity_id: switch.wp_thermostat_in_1
@@ -215,16 +254,17 @@
   - action: notify.persistent_notification
     data:
       title: WP Thermostat AN
-      message: Heizbedarf erkannt - Heizung freigegeben.
+      message: Heizbedarf erkannt und TWW bereit (>40°C) - Heizung freigegeben.
   mode: single
+
 - id: wp_thermostat_heizbedarf_aus
   alias: WP Thermostat - Heizbedarf AUS
-  description: Shelly OFF wenn alle Räume über Soll
+  description: Shelly OFF wenn alle Räume über Soll (5 Min Verzögerung)
   triggers:
   - entity_id: sensor.wp_heizbedarf
     to: 'False'
     for:
-      minutes: 10
+      minutes: 5
     trigger: state
   conditions: []
   actions:
@@ -236,109 +276,219 @@
       title: WP Thermostat AUS
       message: Alle Räume über Soll - Heizung gesperrt.
   mode: single
+
+# ==========================================
+# WP NACHTABSENKUNG (STAFFELIERT)
+# ==========================================
 - id: wp_nachtabsenkung_start
-  alias: WP Nachtabsenkung Start
-  description: Um 21 Uhr alle Thermostaten -3°C
+  alias: WP Nachtabsenkung Start (21 Uhr)
+  description: Alle Thermostaten Soll -3°C zeitversetzt (alle 15 Min)
   triggers:
   - at: '21:00:00'
     trigger: time
   conditions: []
   actions:
   - action: climate.set_temperature
-    target:
-      entity_id: climate.st1820_80b54e38809c
     data:
       temperature: "{{ state_attr('climate.st1820_80b54e38809c', 'temperature') | float - 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f2dbc8
+      entity_id: climate.st1820_80b54e38809c
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f2dbc8', 'temperature') | float - 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f4860c
+      entity_id: climate.st1820_b08184f2dbc8
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f4860c', 'temperature') | float - 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f48e64
+      entity_id: climate.st1820_b08184f4860c
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f48e64', 'temperature') | float - 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f5c164
+      entity_id: climate.st1820_b08184f48e64
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f5c164', 'temperature') | float - 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f67248
+      entity_id: climate.st1820_b08184f5c164
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f67248', 'temperature') | float - 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.t_kuche_eg
+      entity_id: climate.st1820_b08184f67248
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.t_kuche_eg', 'temperature') | float - 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.thermostat_buro
+      entity_id: climate.t_kuche_eg
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.thermostat_buro', 'temperature') | float - 3 }}"
+    target:
+      entity_id: climate.thermostat_buro
   - action: notify.persistent_notification
     data:
-      title: Nachtabsenkung aktiv
-      message: Alle Thermostaten -3°C abgesenkt.
+      title: WP Nachtabsenkung gestartet
+      message: Die schrittweise Absenkung der Thermostate wurde gestartet.
   mode: single
+
 - id: wp_nachtabsenkung_ende
-  alias: WP Nachtabsenkung Ende
-  description: Um 03 Uhr alle Thermostaten +3°C
+  alias: WP Nachtabsenkung Ende (04 Uhr)
+  description: Alle Thermostaten Soll +3°C zeitversetzt (alle 15 Min)
   triggers:
-  - at: '03:00:00'
+  - at: '04:00:00'
     trigger: time
   conditions: []
   actions:
   - action: climate.set_temperature
-    target:
-      entity_id: climate.st1820_80b54e38809c
     data:
       temperature: "{{ state_attr('climate.st1820_80b54e38809c', 'temperature') | float + 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f2dbc8
+      entity_id: climate.st1820_80b54e38809c
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f2dbc8', 'temperature') | float + 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f4860c
+      entity_id: climate.st1820_b08184f2dbc8
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f4860c', 'temperature') | float + 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f48e64
+      entity_id: climate.st1820_b08184f4860c
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f48e64', 'temperature') | float + 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f5c164
+      entity_id: climate.st1820_b08184f48e64
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f5c164', 'temperature') | float + 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.st1820_b08184f67248
+      entity_id: climate.st1820_b08184f5c164
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.st1820_b08184f67248', 'temperature') | float + 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.t_kuche_eg
+      entity_id: climate.st1820_b08184f67248
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.t_kuche_eg', 'temperature') | float + 3 }}"
-  - action: climate.set_temperature
     target:
-      entity_id: climate.thermostat_buro
+      entity_id: climate.t_kuche_eg
+  - delay: "00:15:00"
+  - action: climate.set_temperature
     data:
       temperature: "{{ state_attr('climate.thermostat_buro', 'temperature') | float + 3 }}"
+    target:
+      entity_id: climate.thermostat_buro
   - action: notify.persistent_notification
     data:
-      title: Nachtabsenkung beendet
-      message: Alle Thermostaten +3°C zurückgesetzt.
+      title: WP Aufheizphase gestartet
+      message: Das schrittweise Aufheizen der Thermostate wurde gestartet.
   mode: single
+
+# ==========================================
+# WP DIAGNOSE (TAKTUNGS-ERKENNUNG)
+# ==========================================
+- id: wp_takten_erkennung
+  alias: WP Takten Erkennung
+  description: Erkennt Kurzzyklen mit Ursachen-Diagnose
+  mode: single
+  triggers:
+  - entity_id: sensor.mitsubishi_wp_warmepumpe_frequenz
+    above: 0
+    trigger: numeric_state
+  actions:
+  - delay: "00:00:30"
+  - variables:
+      start_betriebsart: "{{ states('sensor.mitsubishi_wp_betriebsart') }}"
+      start_vorlauf: "{{ states('sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1') | float(0) }}"
+      start_ruecklauf: "{{ states('sensor.mitsubishi_wp_rucklauftemperatur') | float(0) }}"
+      start_tww: "{{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') | float(0) }}"
+      start_tww_soll: "{{ states('sensor.mitsubishi_wp_solltemperatur_wasserspeicher_tww') | float(0) }}"
+      start_durchfluss: "{{ states('sensor.mitsubishi_wp_durchflussmenge') | float(0) }}"
+      start_shelly: "{{ states('switch.wp_thermostat_in_1') }}"
+      start_heizbedarf: "{{ states('sensor.wp_heizbedarf') }}"
+      start_defrost: "{{ states('sensor.mitsubishi_wp_abtaubetrieb') }}"
+      start_zeit: "{{ now() }}"
+      aktive_raeume: >
+        {% set rooms = [
+          ('Eltern UG', 'climate.st1820_80b54e38809c'),
+          ('Flur UG', 'climate.st1820_b08184f2dbc8'),
+          ('Esszimmer', 'climate.st1820_b08184f4860c'),
+          ('Flur', 'climate.st1820_b08184f48e64'),
+          ('Wohnzimmer', 'climate.st1820_b08184f5c164'),
+          ('Küche UG', 'climate.st1820_b08184f67248'),
+          ('Küche EG', 'climate.t_kuche_eg'),
+          ('Büro', 'climate.thermostat_buro')
+        ] %} 
+        {% set active = namespace(list=[]) %}
+        {% for name, entity in rooms %}
+          {% set ist = state_attr(entity, 'current_temperature') | float(99) %}
+          {% set soll = state_attr(entity, 'temperature') | float(0) %}
+          {% if ist < soll %}
+            {% set active.list = active.list + [name ~ ' (' ~ ist ~ '/' ~ soll ~ '°C)'] %}
+          {% endif %}
+        {% endfor %} 
+        {{ active.list | join(', ') if active.list | length > 0 else 'Kein Raum unter Soll' }}
+  - wait_for_trigger:
+    - entity_id: sensor.mitsubishi_wp_warmepumpe_frequenz
+      below: 1
+      trigger: numeric_state
+    timeout: "01:00:00"
+    continue_on_timeout: false
+  - variables:
+      laufzeit_minuten: "{{ ((as_timestamp(now()) - as_timestamp(start_zeit)) / 60) | round(1) }}"
+      ende_vorlauf: "{{ states('sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1') | float(0) }}"
+      ende_ruecklauf: "{{ states('sensor.mitsubishi_wp_rucklauftemperatur') | float(0) }}"
+      ende_tww: "{{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') | float(0) }}"
+      ende_durchfluss: "{{ states('sensor.mitsubishi_wp_durchflussmenge') | float(0) }}"
+      aussen_temp: "{{ states('sensor.mitsubishi_wp_aussentemperatur') | float(0) }}"
+      spreizung: "{{ (ende_vorlauf - ende_ruecklauf) | round(1) }}"
+      diagnose: >
+        {% if start_defrost in ['Abtauung', 'Defrost', '2'] %}
+          ❄️ Abtauvorgang — kein Fehler
+        {% elif start_betriebsart in ['Warmwasser', '1'] %}
+          🔵 TWW-Nachheizung (Speicher {{ start_tww }}→{{ ende_tww }}°C, Soll {{ start_tww_soll }}°C)
+        {% elif start_betriebsart in ['Heizen', '2'] and ende_durchfluss < 1 %}
+          🔴 Kein Durchfluss! Pumpe oder Ventile prüfen
+        {% elif start_betriebsart in ['Heizen', '2'] and (ende_vorlauf - ende_ruecklauf) < 1 %}
+          🔴 Hydraulischer Kurzschluss! Spreizung {{ spreizung }}°C — Verursacher: {{ aktive_raeume }}
+        {% elif start_betriebsart in ['Heizen', '2'] and (ende_vorlauf - start_vorlauf) < 2 %}
+          🟡 Kaum Temperaturhub (VL {{ start_vorlauf }}→{{ ende_vorlauf }}°C) → zu wenig Wärmeabnahme
+        {% elif start_betriebsart in ['Heizen', '2'] and start_heizbedarf | lower in ['false', 'off', '0'] %}
+          🟠 Kein Heizbedarf gemeldet → Shelly-Logik prüfen
+        {% elif start_betriebsart in ['Heizen', '2'] %}
+          🔴 Laufzeit zu kurz (nur {{ laufzeit_minuten }} Min) → Wärmeabnahme blockiert?
+        {% else %}
+          ⚪ Betriebsart: {{ start_betriebsart }}
+        {% endif %}
+  - condition: template
+    value_template: "{{ laufzeit_minuten | float < 10 }}"
+  - action: notify.persistent_notification
+    data:
+      title: "⚠️ WP Kurzzyklus erkannt"
+      message: >
+        Kompressor lief nur {{ laufzeit_minuten }} Minuten!
+        📋 Diagnose: {{ diagnose }}
+        ⏱️ Start: {{ start_zeit | as_timestamp | timestamp_custom('%H:%M:%S') }}
+        🏠 Räume: {{ aktive_raeume }}
+        🌡️ Spreizung: {{ spreizung }}°C
+  - action: counter.increment
+    target:
+      entity_id: counter.wp_kurzzyklen_heute
