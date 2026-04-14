@@ -1,4 +1,31 @@
 # ==========================================
+# WEIHNACHTSBELEUCHTUNG
+# ==========================================
+- id: weihnachtsbeleuchtung_17_an
+  alias: Weihnachtsbeleuchtung 17 Uhr AN
+  triggers:
+  - at: '17:00:00'
+    trigger: time
+  conditions: []
+  actions:
+  - target:
+      entity_id: group.weihnachtsbeleuchtung
+    action: homeassistant.turn_on
+  mode: single
+
+- id: weihnachtsbeleuchtung_22_aus
+  alias: Weihnachtsbeleuchtung 22 Uhr AUS
+  triggers:
+  - at: '22:00:00'
+    trigger: time
+  conditions: []
+  actions:
+  - target:
+      entity_id: group.weihnachtsbeleuchtung
+    action: homeassistant.turn_off
+  mode: single
+
+# ==========================================
 # WP TAKTUNG & MONITORING
 # ==========================================
 - id: wp_taktung_zaehlen
@@ -31,21 +58,18 @@
   mode: single
 
 # ==========================================
-# WP PV-BOOST LOGIK
+# WP PV-BOOST LOGIK (Ziel 60°C)
 # ==========================================
 - id: wp_boost_aktivieren
   alias: WP Boost bei PV-Überschuss aktivieren
-  description: Boost auf 60°C wenn WP läuft, PV-Überschuss vorliegt und Batterie > 80%
+  description: Erhöht Soll auf 60°C und startet WP, wenn PV-Überschuss vorliegt
   triggers:
-  - entity_id: sensor.mitsubishi_wp_warmepumpe_frequenz
-    above: 5
+  - entity_id: sensor.feed_in
+    above: 1.2
     for:
-      minutes: 2
+      minutes: 5
     trigger: numeric_state
   conditions:
-  - condition: numeric_state
-    entity_id: sensor.feed_in
-    above: 1
   - condition: numeric_state
     entity_id: sensor.battery_soc_1
     above: 80
@@ -54,7 +78,7 @@
     state: 'off'
   - condition: time
     after: '07:00:00'
-    before: '21:00:00'
+    before: '20:00:00'
   actions:
   - target:
       entity_id: input_boolean.wp_boost_aktiv
@@ -70,17 +94,18 @@
     data:
       value: 60
     action: input_number.set_value
+  - target:
+      entity_id: switch.wp_thermostat_in_1
+    action: switch.turn_on
   - action: notify.persistent_notification
     data:
-      title: WP Boost aktiv
-      message: >
-        Soll auf 60°C gesetzt. PV-Einspeisung: {{ states('sensor.feed_in') }} kW.
-        Batterie: {{ states('sensor.battery_soc_1') }}%.
+      title: WP Boost gestartet
+      message: "Speicher wird auf 60°C geladen (PV-Überschuss)."
   mode: single
 
 - id: wp_boost_beenden
   alias: WP Boost beenden
-  description: Zurück auf 50°C bei Zeitende oder leerem Akku
+  description: Zurück auf 50°C bei Ziel (60°C erreicht), Zeitende oder leerem Akku
   triggers:
   - at: '21:00:00'
     trigger: time
@@ -88,6 +113,11 @@
     below: 75
     for:
       minutes: 5
+    trigger: numeric_state
+  - entity_id: sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww
+    above: 59.5
+    for:
+      minutes: 1
     trigger: numeric_state
   conditions:
   - condition: state
@@ -115,7 +145,6 @@
 # ==========================================
 - id: zappi_smart_charge_solar
   alias: Zappi - Laden starten bei PV-Überschuss (Tags)
-  description: Nutzt ECO+ wenn Sonne da und Hausbatterie > 80%
   triggers:
   - entity_id: sensor.feed_in
     above: 1.4
@@ -123,9 +152,9 @@
       minutes: 5
     trigger: numeric_state
   conditions:
-  - condition: state
-    entity_id: sensor.myenergi_zappi_15553841_plug_status
-    state: 'Connected'
+  - condition: template
+    value_template: >
+      {{ states('sensor.myenergi_zappi_15553841_plug_status') in ['Connected', 'Charging', 'Waiting for EV'] }}
   - condition: numeric_state
     entity_id: sensor.battery_soc_1
     above: 80
@@ -138,15 +167,14 @@
   mode: single
 
 - id: zappi_smart_charge_night
-  alias: Zappi - Nacht-Ladung (Vorbereitung Dynamischer Tarif)
-  description: Schaltet auf FAST um 01:00 Uhr
+  alias: Zappi - Nacht-Ladung
   triggers:
   - at: '01:00:00'
     trigger: time
   conditions:
-  - condition: state
-    entity_id: sensor.myenergi_zappi_15553841_plug_status
-    state: 'Connected'
+  - condition: template
+    value_template: >
+      {{ states('sensor.myenergi_zappi_15553841_plug_status') in ['Connected', 'Charging', 'Waiting for EV'] }}
   actions:
   - target:
       entity_id: select.myenergi_zappi_15553841_charge_mode
@@ -156,14 +184,12 @@
   mode: single
 
 - id: zappi_smart_charge_stop
-  alias: Zappi - Ladung beenden (Morgens / Standby)
-  description: Stoppt Ladung um 07:00 Uhr oder Sonnenuntergang
+  alias: Zappi - Ladung beenden
   triggers:
   - at: '07:00:00'
     trigger: time
   - platform: sun
     event: sunset
-  conditions: []
   actions:
   - target:
       entity_id: select.myenergi_zappi_15553841_charge_mode
@@ -173,21 +199,17 @@
   mode: single
 
 # ==========================================
-# WP THERMOSTAT STEUERUNG (IN1)
+# WP THERMOSTAT STEUERUNG (LADEWÄCHTER 40/50/60)
 # ==========================================
 - id: wp_thermostat_heizbedarf_an
-  alias: WP Thermostat - Heizbedarf AN
-  description: Shelly ON wenn Raum unter Soll UND TWW über 40°C
+  alias: WP Thermostat - Ladung AN (< 40°C)
+  description: Shelly ON wenn Speicher unter 40°C fällt
   triggers:
-  - entity_id: sensor.wp_heizbedarf
+  - entity_id: sensor.wp_ladewaechter
     to: 'True'
     for:
       minutes: 1
     trigger: state
-  conditions:
-  - condition: numeric_state
-    entity_id: sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww
-    above: 40
   actions:
   - target:
       entity_id: switch.wp_thermostat_in_1
@@ -195,13 +217,13 @@
   mode: single
 
 - id: wp_thermostat_heizbedarf_aus
-  alias: WP Thermostat - Heizbedarf AUS
-  description: Shelly OFF wenn alle Räume über Soll (5 Min Verzögerung)
+  alias: WP Thermostat - Ladung AUS (> 50/60°C)
+  description: Shelly OFF wenn Zieltemperatur erreicht
   triggers:
-  - entity_id: sensor.wp_heizbedarf
+  - entity_id: sensor.wp_ladewaechter
     to: 'False'
     for:
-      minutes: 5
+      minutes: 1
     trigger: state
   actions:
   - target:
@@ -214,7 +236,6 @@
 # ==========================================
 - id: wp_nachtabsenkung_start
   alias: WP Nachtabsenkung Start (21 Uhr)
-  description: Alle Thermostaten Soll -3°C zeitversetzt (alle 15 Min)
   triggers:
   - at: '21:00:00'
     trigger: time
@@ -270,7 +291,6 @@
 
 - id: wp_nachtabsenkung_ende
   alias: WP Nachtabsenkung Ende (04 Uhr)
-  description: Alle Thermostaten Soll +3°C zeitversetzt (alle 15 Min)
   triggers:
   - at: '04:00:00'
     trigger: time
@@ -342,9 +362,9 @@
       start_vorlauf: "{{ states('sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1') | float(0) }}"
       start_ruecklauf: "{{ states('sensor.mitsubishi_wp_rucklauftemperatur') | float(0) }}"
       start_tww: "{{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') | float(0) }}"
-      start_tww_soll: "{{ states('sensor.mitsubishi_wp_solltemperatur_wasserspeicher_tww') | float(0) }}"
       start_durchfluss: "{{ states('sensor.mitsubishi_wp_durchflussmenge') | float(0) }}"
       start_defrost: "{{ states('sensor.mitsubishi_wp_abtaubetrieb') }}"
+      start_shelly_in1: "{{ states('switch.wp_thermostat_in_1') }}"
       start_zeit: "{{ now() }}"
   - wait_for_trigger:
     - entity_id: sensor.mitsubishi_wp_warmepumpe_frequenz
@@ -380,6 +400,7 @@
       message: >
         Dauer: {{ laufzeit_minuten }} Min. 
         Diagnose: {{ diagnose }}
+        Shelly IN1: {{ start_shelly_in1 }}
         Start: {{ start_zeit | as_timestamp | timestamp_custom('%H:%M:%S') }}
   - action: counter.increment
     target:
