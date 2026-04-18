@@ -1,286 +1,679 @@
-type: vertical-stack
-cards:
-  # ─── HAUPTKARTE: Status + Temperaturen ────────────────────
-  - type: custom:mushroom-template-card
-    entity: sensor.mitsubishi_wp_warmepumpe_frequenz
-    primary: Wärmepumpe
-    secondary: >-
-      {% set freq = states('sensor.mitsubishi_wp_warmepumpe_frequenz') | float(0) %}
-      {% if freq > 5 %}
-        🟢 Läuft — {{ freq | round(0) }} Hz
-      {% else %}
-        ⚫ Aus
-      {% endif %}
-
-      Speicher: {{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') | float(0) | round(1) }}°C → Soll: {{ states('sensor.mitsubishi_wp_solltemperatur_wasserspeicher_tww') | float(0) | round(0) }}°C | Außen: {{ states('sensor.mitsubishi_wp_aussentemperatur') | float(0) | round(1) }}°C
-    multiline_secondary: true
+title: Ecodan PV-Boost
+views:
+  - title: Hauptübersicht
+    path: wp-main
     icon: mdi:heat-pump
-    icon_color: |-
-      {% if states('sensor.mitsubishi_wp_warmepumpe_frequenz') | float(0) > 5 %}
-        green
-      {% else %}
-        blue
-      {% endif %}
-    tap_action:
-      action: more-info
-
-  # ─── CHIPS: Batterie, PV, Einspeisung, PV Jetzt ──────────
-  - type: custom:mushroom-chips-card
-    chips:
-      - type: template
-        icon: |-
-          {% set soc = states('sensor.battery_soc_1') | float(0) %}
-          {% if soc > 80 %}
-            mdi:battery-high
-          {% elif soc > 40 %}
-            mdi:battery-medium
-          {% else %}
-            mdi:battery-low
-          {% endif %}
-        icon_color: |-
-          {% set soc = states('sensor.battery_soc_1') | float(0) %}
-          {% if soc > 70 %}
-            green
-          {% elif soc > 30 %}
-            orange
-          {% else %}
-            red
-          {% endif %}
-        content: "{{ states('sensor.battery_soc_1') | float(0) | round(0) }}%"
-      - type: template
-        icon: mdi:solar-power
-        icon_color: |-
-          {% if states('sensor.solar_energy_today') | float(0) > 0 %}
-            yellow
-          {% else %}
-            grey
-          {% endif %}
-        content: >-
-          Erz: {{ states('sensor.solar_energy_today') | float(0) | round(1) }} kWh
-      - type: template
-        icon: mdi:transmission-tower-export
-        icon_color: |-
-          {% if states('sensor.feed_in_energy_today') | float(0) > 0 %}
-            green
-          {% else %}
-            grey
-          {% endif %}
-        content: >-
-          Einsp: {{ states('sensor.feed_in_energy_today') | float(0) | round(1) }} kWh
-      - type: template
-        icon: mdi:flash
-        icon_color: |-
-          {% set pv = states('sensor.pv_power') | float(0) %}
-          {% if pv > 1 %}
-            green
-          {% elif pv > 0.1 %}
-            orange
-          {% else %}
-            grey
-          {% endif %}
-        content: >-
-          PV: {{ (states('sensor.pv_power') | float(0) * 1000) | round(0) }} W
-
-  # ─── GRID: Verdichter, Vorlauf, Betriebsart, WP Leistung ─
-  - type: grid
-    columns: 2
-    square: false
+    badges: []
     cards:
-      - type: custom:mushroom-template-card
-        entity: sensor.mitsubishi_wp_warmepumpe_frequenz
-        primary: Verdichter
-        secondary: >-
-          {{ states('sensor.mitsubishi_wp_warmepumpe_frequenz') | float(0) | round(0) }} Hz
-        icon: mdi:engine
-        icon_color: |-
-          {% if states('sensor.mitsubishi_wp_warmepumpe_frequenz') | float(0) > 5 %}
-            orange
-          {% else %}
-            grey
-          {% endif %}
-      - type: custom:mushroom-template-card
-        entity: sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1
-        primary: Vorlauf
-        secondary: >-
-          {{ states('sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1') | float(0) | round(1) }} °C
-        icon: mdi:thermometer-chevron-up
-        icon_color: |-
-          {% if states('sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1') | float(0) > 30 %}
-            red
-          {% else %}
-            blue
-          {% endif %}
-      - type: custom:mushroom-template-card
-        entity: sensor.mitsubishi_wp_betriebsart
-        primary: Betriebsart
-        secondary: "{{ states('sensor.mitsubishi_wp_betriebsart') }}"
-        icon: mdi:cog
-        icon_color: |-
-          {% if states('sensor.mitsubishi_wp_betriebsart') != 'Stopp' %}
-            green
-          {% else %}
-            grey
-          {% endif %}
-      - type: custom:mushroom-template-card
-        entity: sensor.wp_gesamtverbrauch
-        primary: WP Leistung
-        secondary: >-
-          {% set total = states('sensor.wp_gesamtverbrauch') | float(0) %}
-          {% if total > 1000 %}
-            {{ (total / 1000) | round(2) }} kW
-          {% else %}
-            {{ total | round(0) }} W
-          {% endif %}
-        icon: mdi:lightning-bolt
-        icon_color: |-
-          {% if states('sensor.wp_gesamtverbrauch') | float(0) > 100 %}
-            orange
-          {% else %}
-            grey
-          {% endif %}
+      - type: vertical-stack
+        cards:
+          
+          # ─── SEKTION 1: KOPFBEREICH ENERGIESTATUS (CHIPS) ────────────────────
+          - type: custom:mushroom-chips-card
+            alignment: center
+            chips:
+              - type: template
+                icon: |-
+                  {% set soc = states('sensor.battery_soc_1') | float(0) %}
+                  {% if soc > 80 %} mdi:battery-high
+                  {% elif soc > 40 %} mdi:battery-medium
+                  {% else %} mdi:battery-low
+                  {% endif %}
+                icon_color: |-
+                  {% set soc = states('sensor.battery_soc_1') | float(0) %}
+                  {% if soc > 70 %} green
+                  {% elif soc > 30 %} orange
+                  {% else %} red
+                  {% endif %}
+                content: "{{ states('sensor.battery_soc_1') | float(0) | round(0) }}%"
+              - type: template
+                icon: mdi:solar-power
+                icon_color: |-
+                  {% if states('sensor.solar_energy_today') | float(0) > 0 %} yellow
+                  {% else %} grey
+                  {% endif %}
+                content: "Erz: {{ states('sensor.solar_energy_today') | float(0) | round(1) }} kWh"
+              - type: template
+                icon: mdi:transmission-tower-export
+                icon_color: |-
+                  {% if states('sensor.feed_in_energy_today') | float(0) > 0 %} green
+                  {% else %} grey
+                  {% endif %}
+                content: "Einsp: {{ states('sensor.feed_in_energy_today') | float(0) | round(1) }} kWh"
+              - type: template
+                icon: mdi:flash
+                icon_color: |-
+                  {% set pv = states('sensor.pv_power') | float(0) %}
+                  {% if pv > 1 %} green
+                  {% elif pv > 0.1 %} orange
+                  {% else %} grey
+                  {% endif %}
+                content: "PV: {{ (states('sensor.pv_power') | float(0) * 1000) | round(0) }} W"
 
-  # ─── SOLL-TEMPERATUR SLIDER ──────────────────────────────
-  - type: custom:mushroom-number-card
-    entity: input_number.wp_soll_temperatur
-    display_mode: slider
-    name: Soll-Temperatur TWW
-    icon: mdi:thermometer-plus
+          # ─── SEKTION 2: HAUPTSTATUS WÄRMEPUMPE & LADEWÄCHTER ────────────────
+          - type: custom:mushroom-template-card
+            entity: sensor.mitsubishi_wp_warmepumpe_frequenz
+            primary: Mitsubishi Ecodan
+            secondary: >-
+              {% set freq = states('sensor.mitsubishi_wp_warmepumpe_frequenz') | float(0) %}
+              {% if freq > 5 %}
+                🟢 Verdichter Läuft — {{ freq | round(0) }} Hz
+              {% else %}
+                ⚫ Verdichter Aus
+              {% endif %}
 
-  # ─── GRID: COP Aktuell + COP Heute ───────────────────────
-  - type: grid
-    columns: 2
-    square: false
-    cards:
-      - type: custom:mushroom-template-card
-        entity: sensor.wp_cop
-        primary: COP Aktuell
-        secondary: >-
-          {% set cop = states('sensor.wp_cop') | float(0) %}
-          {% if cop > 0 %}
-            {{ cop }}
-          {% else %}
-            —
-          {% endif %}
-        icon: mdi:gauge
-        icon_color: |-
-          {% set cop = states('sensor.wp_cop') | float(0) %}
-          {% if cop >= 4 %}
-            green
-          {% elif cop >= 3 %}
-            orange
-          {% elif cop > 0 %}
-            red
-          {% else %}
-            grey
-          {% endif %}
-      - type: custom:mushroom-template-card
-        entity: sensor.wp_cop_heute
-        primary: COP Heute
-        secondary: >-
-          {% set cop = states('sensor.wp_cop_heute') | float(0) %}
-          {% if cop > 0 %}
-            {{ cop }}
-          {% else %}
-            —
-          {% endif %}
-        icon: mdi:chart-line
-        icon_color: |-
-          {% set cop = states('sensor.wp_cop_heute') | float(0) %}
-          {% if cop >= 4 %}
-            green
-          {% elif cop >= 3 %}
-            orange
-          {% elif cop > 0 %}
-            red
-          {% else %}
-            grey
-          {% endif %}
+              Speicher: {{ states('sensor.mitsubishi_wp_isttemperatur_wasserspeicher_tww') | float(0) | round(1) }}°C (Soll: {{ states('sensor.mitsubishi_wp_solltemperatur_wasserspeicher_tww') | float(0) | round(0) }}°C) | Außen: {{ states('sensor.mitsubishi_wp_aussentemperatur') | float(0) | round(1) }}°C
+            multiline_secondary: true
+            icon: mdi:heat-pump
+            icon_color: |-
+              {% if states('sensor.mitsubishi_wp_warmepumpe_frequenz') | float(0) > 5 %}
+                green
+              {% else %}
+                blue
+              {% endif %}
+            tap_action:
+              action: more-info
 
-  # ─── GRID: WP Verbrauch Heute / Monat / Jahr ─────────────
-  - type: grid
-    columns: 3
-    square: false
-    cards:
-      - type: custom:mushroom-template-card
-        entity: sensor.wp_verbrauch_heute
-        primary: WP Heute
-        secondary: >-
-          {{ states('sensor.wp_verbrauch_heute') | float(0) | round(2) }} kWh
-        icon: mdi:hours-24
-        icon_color: teal
-      - type: custom:mushroom-template-card
-        entity: sensor.wp_verbrauch_monat
-        primary: WP Monat
-        secondary: >-
-          {{ states('sensor.wp_verbrauch_monat') | float(0) | round(2) }} kWh
-        icon: mdi:calendar-month
-        icon_color: teal
-      - type: custom:mushroom-template-card
-        entity: sensor.wp_verbrauch_jahr
-        primary: WP Jahr
-        secondary: >-
-          {{ states('sensor.wp_verbrauch_jahr') | float(0) | round(2) }} kWh
-        icon: mdi:calendar
-        icon_color: teal
+          # --- LADEWÄCHTER STATUS CHIPS ---
+          - type: custom:mushroom-chips-card
+            alignment: center
+            chips:
+              - type: template
+                entity: sensor.wp_ladewaechter
+                icon: mdi:thermometer-water
+                content: >-
+                  {% if states('sensor.wp_ladewaechter') == 'True' %}
+                    Ladewächter AKTIV (Heizbedarf TWW)
+                  {% else %}
+                    Ladewächter SATT (Speicher voll)
+                  {% endif %}
+                icon_color: |-
+                  {% if states('sensor.wp_ladewaechter') == 'True' %}
+                    orange
+                  {% else %}
+                    green
+                  {% endif %}
+              - type: template
+                entity: switch.wp_thermostat_in_1
+                icon: mdi:pump
+                content: >-
+                  {% if is_state('switch.wp_thermostat_in_1', 'on') %}
+                    IN1: Pumpe Freigabe
+                  {% else %}
+                    IN1: Pumpe Gesperrt
+                  {% endif %}
+                icon_color: |-
+                  {% if is_state('switch.wp_thermostat_in_1', 'on') %}
+                    blue
+                  {% else %}
+                    grey
+                  {% endif %}
 
-  # ─── GRID: Taktung + Bewertung + PV Boost ────────────────
-  - type: grid
-    columns: 3
-    square: false
-    cards:
-      - type: custom:mushroom-template-card
-        entity: counter.wp_starts_heute
-        primary: Taktung
-        secondary: |-
-          {% set starts = states('counter.wp_starts_heute') | int(0) %}
-          {{ starts }} Starts
-          {% set lz = states('sensor.wp_laufzeit_pro_zyklus') | float(0) %}
-          {% if starts > 0 %}
-            Ø {{ lz | round(0) }} min
-          {% endif %}
-        icon: mdi:restart
-        icon_color: |-
-          {% set starts = states('counter.wp_starts_heute') | int(0) %}
-          {% if starts > 10 %}
-            red
-          {% elif starts > 6 %}
-            orange
-          {% else %}
-            green
-          {% endif %}
-      - type: custom:mushroom-template-card
-        entity: sensor.wp_taktungsbewertung
-        primary: Bewertung
-        secondary: "{{ states('sensor.wp_taktungsbewertung') }}"
-        icon: mdi:check-decagram
-        icon_color: |-
-          {% set bew = states('sensor.wp_taktungsbewertung') %}
-          {% if 'Optimal' in bew %}
-            green
-          {% elif 'Normal' in bew %}
-            yellow
-          {% elif 'Beobachten' in bew %}
-            orange
-          {% elif 'Kritisch' in bew %}
-            red
-          {% else %}
-            grey
-          {% endif %}
-      - type: custom:mushroom-template-card
-        entity: input_boolean.wp_boost_aktiv
-        primary: PV Boost
-        secondary: |-
-          {% if is_state('input_boolean.wp_boost_aktiv', 'on') %}
-            🔥 Aktiv — 60°C
-          {% else %}
-            Inaktiv — 50°C
-          {% endif %}
-        icon: mdi:solar-power-variant
-        icon_color: |-
-          {% if is_state('input_boolean.wp_boost_aktiv', 'on') %}
-            orange
-          {% else %}
-            grey
-          {% endif %}
-        tap_action:
-          action: toggle
+          # ─── SEKTION 3: FORD KUGA (ZAPPI EV CHARGER) ────────────────────────
+          - type: custom:mushroom-title-card
+            title: Ford Kuga (Zappi)
+            subtitle: Ladestation Status & Steuerung
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: custom:mushroom-entity-card
+                entity: select.myenergi_zappi_15553841_charge_mode
+                name: "Zappi Modus"
+                icon: mdi:ev-station
+                fill_container: false
+              - type: custom:mushroom-template-card
+                entity: sensor.myenergi_zappi_15553841_plug_status
+                primary: "Stecker Status"
+                secondary: "{{ states('sensor.myenergi_zappi_15553841_plug_status') }}"
+                icon: |-
+                  {% set status = states('sensor.myenergi_zappi_15553841_plug_status') %}
+                  {% if status in ['Connected', 'Waiting for EV'] %} mdi:ev-plug-type2
+                  {% elif status == 'Charging' %} mdi:battery-charging-high
+                  {% else %} mdi:power-plug-off
+                  {% endif %}
+                icon_color: |-
+                  {% set status = states('sensor.myenergi_zappi_15553841_plug_status') %}
+                  {% if status == 'Charging' %} green
+                  {% elif status in ['Connected', 'Waiting for EV'] %} blue
+                  {% else %} grey
+                  {% endif %}
+                tap_action:
+                  action: more-info
+
+          # ─── SEKTION 4: KERNWERTE WP (GRID) ─────────────────────────────────
+          - type: custom:mushroom-title-card
+            title: Hydraulik & Leistung
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: custom:mushroom-template-card
+                entity: sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1
+                primary: Vorlauf
+                secondary: "{{ states('sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1') | float(0) | round(1) }} °C"
+                icon: mdi:thermometer-chevron-up
+                icon_color: |-
+                  {% if states('sensor.mitsubishi_wp_vorlauftemperatur_heizkreis_1') | float(0) > 30 %} red
+                  {% else %} blue
+                  {% endif %}
+              - type: custom:mushroom-template-card
+                entity: sensor.mitsubishi_wp_rucklauftemperatur
+                primary: Rücklauf
+                secondary: "{{ states('sensor.mitsubishi_wp_rucklauftemperatur') | float(0) | round(1) }} °C"
+                icon: mdi:thermometer-chevron-down
+                icon_color: blue
+              - type: custom:mushroom-template-card
+                entity: sensor.mitsubishi_wp_betriebsart
+                primary: Betriebsart
+                secondary: "{{ states('sensor.mitsubishi_wp_betriebsart') }}"
+                icon: mdi:cog
+                icon_color: |-
+                  {% if states('sensor.mitsubishi_wp_betriebsart') != 'Stopp' %} green
+                  {% else %} grey
+                  {% endif %}
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_gesamtverbrauch
+                primary: WP Leistung
+                secondary: >-
+                  {% set total = states('sensor.wp_gesamtverbrauch') | float(0) %}
+                  {% if total > 1000 %}
+                    {{ (total / 1000) | round(2) }} kW
+                  {% else %}
+                    {{ total | round(0) }} W
+                  {% endif %}
+                icon: mdi:lightning-bolt
+                icon_color: |-
+                  {% if states('sensor.wp_gesamtverbrauch') | float(0) > 100 %} orange
+                  {% else %} grey
+                  {% endif %}
+
+          # ─── SEKTION 5: STEUERUNG & AUTOMATIK ───────────────────────────────
+          - type: custom:mushroom-title-card
+            title: Steuerung & Automatik Übersteuerung
+          - type: custom:mushroom-number-card
+            entity: input_number.wp_soll_temperatur
+            display_mode: slider
+            name: Modbus Soll-Temperatur TWW
+            icon: mdi:thermometer-plus
+            icon_color: orange
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: custom:mushroom-template-card
+                entity: input_boolean.wp_boost_aktiv
+                primary: PV Boost
+                secondary: |-
+                  {% if is_state('input_boolean.wp_boost_aktiv', 'on') %}
+                    🔥 Aktiv — 60°C
+                  {% else %}
+                    Inaktiv — 50°C/40°C
+                  {% endif %}
+                icon: mdi:solar-power-variant
+                icon_color: |-
+                  {% if is_state('input_boolean.wp_boost_aktiv', 'on') %} orange
+                  {% else %} grey
+                  {% endif %}
+                tap_action:
+                  action: toggle
+              - type: custom:mushroom-template-card
+                entity: binary_sensor.haus_heizbedarf
+                primary: Haus Heizbedarf
+                secondary: |-
+                  {% if is_state('binary_sensor.haus_heizbedarf', 'on') %}
+                    🟢 Ventile offen
+                  {% else %}
+                    ⚪ Keine Anforderung
+                  {% endif %}
+                icon: mdi:radiator
+                icon_color: |-
+                  {% if is_state('binary_sensor.haus_heizbedarf', 'on') %} green
+                  {% else %} grey
+                  {% endif %}
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_rueckkanal_status
+                primary: Modbus Rückkanal
+                secondary: >-
+                  {{ states('sensor.wp_rueckkanal_status') }} (Delta: {{ states('sensor.wp_regelabweichung') }}K)
+                icon: |-
+                  {% if 'Drift' in states('sensor.wp_rueckkanal_status') %} mdi:sync-alert
+                  {% else %} mdi:sync
+                  {% endif %}
+                icon_color: |-
+                  {% if 'Drift' in states('sensor.wp_rueckkanal_status') %} red
+                  {% elif 'Leicht' in states('sensor.wp_rueckkanal_status') %} orange
+                  {% else %} green
+                  {% endif %}
+                tap_action:
+                  action: more-info
+
+          # ─── SEKTION 6: THERMOSTATE (EINZELRAUM) ───────────────────────────
+          - type: custom:mushroom-title-card
+            title: Raumklima (Alle Thermostate)
+            subtitle: Einzelraumsteuerung
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: custom:mushroom-climate-card
+                entity: climate.st1820_80b54e38809c
+                name: Wohnzimmer (1)
+                show_temperature_control: true
+                collapsible_controls: true
+              - type: custom:mushroom-climate-card
+                entity: climate.st1820_b08184f2dbc8
+                name: Wohnzimmer (2)
+                show_temperature_control: true
+                collapsible_controls: true
+              - type: custom:mushroom-climate-card
+                entity: climate.st1820_b08184f4860c
+                name: Wohnzimmer (3)
+                show_temperature_control: true
+                collapsible_controls: true
+              - type: custom:mushroom-climate-card
+                entity: climate.st1820_b08184f48e64
+                name: Flur / Esszimmer
+                show_temperature_control: true
+                collapsible_controls: true
+              - type: custom:mushroom-climate-card
+                entity: climate.st1820_b08184f5c164
+                name: Schlafzimmer
+                show_temperature_control: true
+                collapsible_controls: true
+              - type: custom:mushroom-climate-card
+                entity: climate.st1820_b08184f67248
+                name: Bad
+                show_temperature_control: true
+                collapsible_controls: true
+              - type: custom:mushroom-climate-card
+                entity: climate.t_kuche_eg
+                name: Küche
+                show_temperature_control: true
+                collapsible_controls: true
+              - type: custom:mushroom-climate-card
+                entity: climate.thermostat_buro
+                name: Büro
+                show_temperature_control: true
+                collapsible_controls: true
+
+          # ─── SEKTION 7: BELEUCHTUNG & ROLLOS ───────────────────────────────
+          - type: custom:mushroom-title-card
+            title: Haussteuerung (Rollos & Licht)
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              # Weihnachtsbeleuchtung (bekannt aus wp_automationen_v2)
+              - type: custom:mushroom-light-card
+                entity: group.weihnachtsbeleuchtung
+                name: Weihnachtsbeleuchtung
+                icon: mdi:string-lights
+                show_brightness_control: true
+
+              # ROLLOS KÜCHE EG
+              - type: vertical-stack
+                cards:
+                  - type: custom:mushroom-template-card
+                    entity: cover.shelly2pmg4_48f6eedbd464
+                    primary: Rollo Küche EG
+                    secondary: |-
+                      {% if is_state('cover.shelly2pmg4_48f6eedbd464', 'open') %}
+                        Offen │ {{ state_attr('cover.shelly2pmg4_48f6eedbd464', 'current_position') | default('?') }}%
+                      {% elif is_state('cover.shelly2pmg4_48f6eedbd464', 'closed') %}
+                        Geschlossen
+                      {% elif is_state('cover.shelly2pmg4_48f6eedbd464', 'opening') %}
+                        Fährt hoch ▲
+                      {% elif is_state('cover.shelly2pmg4_48f6eedbd464', 'closing') %}
+                        Fährt runter ▼
+                      {% else %}
+                        {{ states('cover.shelly2pmg4_48f6eedbd464') }}
+                      {% endif %}
+                    icon: >-
+                      {% if is_state('cover.shelly2pmg4_48f6eedbd464', 'open') %}
+                        mdi:window-shutter-open
+                      {% elif is_state('cover.shelly2pmg4_48f6eedbd464', 'opening') or
+                      is_state('cover.shelly2pmg4_48f6eedbd464', 'closing') %}
+                        mdi:window-shutter-cog
+                      {% else %}
+                        mdi:window-shutter
+                      {% endif %}
+                    icon_color: >-
+                      {% if is_state('cover.shelly2pmg4_48f6eedbd464', 'open') %}
+                        blue
+                      {% elif is_state('cover.shelly2pmg4_48f6eedbd464', 'opening') or
+                      is_state('cover.shelly2pmg4_48f6eedbd464', 'closing') %}
+                        orange
+                      {% else %}
+                        grey
+                      {% endif %}
+                    layout: vertical
+                    tap_action:
+                      action: more-info
+                  - type: custom:mushroom-chips-card
+                    alignment: center
+                    chips:
+                      - type: action
+                        icon: mdi:arrow-up
+                        tap_action:
+                          action: call-service
+                          service: cover.open_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_48f6eedbd464
+                      - type: action
+                        icon: mdi:stop
+                        tap_action:
+                          action: call-service
+                          service: cover.stop_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_48f6eedbd464
+                      - type: action
+                        icon: mdi:arrow-down
+                        tap_action:
+                          action: call-service
+                          service: cover.close_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_48f6eedbd464
+
+              # ROLLOS TEICH
+              - type: vertical-stack
+                cards:
+                  - type: custom:mushroom-template-card
+                    entity: cover.shelly2pmg4_58e6c53286ec
+                    primary: Rollo Teich
+                    secondary: |-
+                      {% if is_state('cover.shelly2pmg4_58e6c53286ec', 'open') %}
+                        Offen │ {{ state_attr('cover.shelly2pmg4_58e6c53286ec', 'current_position') | default('?') }}%
+                      {% elif is_state('cover.shelly2pmg4_58e6c53286ec', 'closed') %}
+                        Geschlossen
+                      {% elif is_state('cover.shelly2pmg4_58e6c53286ec', 'opening') %}
+                        Fährt hoch ▲
+                      {% elif is_state('cover.shelly2pmg4_58e6c53286ec', 'closing') %}
+                        Fährt runter ▼
+                      {% else %}
+                        {{ states('cover.shelly2pmg4_58e6c53286ec') }}
+                      {% endif %}
+                    icon: >-
+                      {% if is_state('cover.shelly2pmg4_58e6c53286ec', 'open') %}
+                        mdi:window-shutter-open
+                      {% elif is_state('cover.shelly2pmg4_58e6c53286ec', 'opening') or
+                      is_state('cover.shelly2pmg4_58e6c53286ec', 'closing') %}
+                        mdi:window-shutter-cog
+                      {% else %}
+                        mdi:window-shutter
+                      {% endif %}
+                    icon_color: >-
+                      {% if is_state('cover.shelly2pmg4_58e6c53286ec', 'open') %}
+                        blue
+                      {% elif is_state('cover.shelly2pmg4_58e6c53286ec', 'opening') or
+                      is_state('cover.shelly2pmg4_58e6c53286ec', 'closing') %}
+                        orange
+                      {% else %}
+                        grey
+                      {% endif %}
+                    layout: vertical
+                    tap_action:
+                      action: more-info
+                  - type: custom:mushroom-chips-card
+                    alignment: center
+                    chips:
+                      - type: action
+                        icon: mdi:arrow-up
+                        tap_action:
+                          action: call-service
+                          service: cover.open_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_58e6c53286ec
+                      - type: action
+                        icon: mdi:stop
+                        tap_action:
+                          action: call-service
+                          service: cover.stop_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_58e6c53286ec
+                      - type: action
+                        icon: mdi:arrow-down
+                        tap_action:
+                          action: call-service
+                          service: cover.close_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_58e6c53286ec
+
+              # ROLOS WZ LINKS
+              - type: vertical-stack
+                cards:
+                  - type: custom:mushroom-template-card
+                    entity: cover.shelly2pmg4_58e6c534946c
+                    primary: Rollo WZ Links
+                    secondary: |-
+                      {% if is_state('cover.shelly2pmg4_58e6c534946c', 'open') %}
+                        Offen │ {{ state_attr('cover.shelly2pmg4_58e6c534946c', 'current_position') | default('?') }}%
+                      {% elif is_state('cover.shelly2pmg4_58e6c534946c', 'closed') %}
+                        Geschlossen
+                      {% elif is_state('cover.shelly2pmg4_58e6c534946c', 'opening') %}
+                        Fährt hoch ▲
+                      {% elif is_state('cover.shelly2pmg4_58e6c534946c', 'closing') %}
+                        Fährt runter ▼
+                      {% else %}
+                        {{ states('cover.shelly2pmg4_58e6c534946c') }}
+                      {% endif %}
+                    icon: >-
+                      {% if is_state('cover.shelly2pmg4_58e6c534946c', 'open') %}
+                        mdi:window-shutter-open
+                      {% elif is_state('cover.shelly2pmg4_58e6c534946c', 'opening') or
+                      is_state('cover.shelly2pmg4_58e6c534946c', 'closing') %}
+                        mdi:window-shutter-cog
+                      {% else %}
+                        mdi:window-shutter
+                      {% endif %}
+                    icon_color: >-
+                      {% if is_state('cover.shelly2pmg4_58e6c534946c', 'open') %}
+                        blue
+                      {% elif is_state('cover.shelly2pmg4_58e6c534946c', 'opening') or
+                      is_state('cover.shelly2pmg4_58e6c534946c', 'closing') %}
+                        orange
+                      {% else %}
+                        grey
+                      {% endif %}
+                    layout: vertical
+                    tap_action:
+                      action: more-info
+                  - type: custom:mushroom-chips-card
+                    alignment: center
+                    chips:
+                      - type: action
+                        icon: mdi:arrow-up
+                        tap_action:
+                          action: call-service
+                          service: cover.open_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_58e6c534946c
+                      - type: action
+                        icon: mdi:stop
+                        tap_action:
+                          action: call-service
+                          service: cover.stop_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_58e6c534946c
+                      - type: action
+                        icon: mdi:arrow-down
+                        tap_action:
+                          action: call-service
+                          service: cover.close_cover
+                          target:
+                            entity_id: cover.shelly2pmg4_58e6c534946c
+
+              # ROLLOS WZ RECHTS
+              - type: vertical-stack
+                cards:
+                  - type: custom:mushroom-template-card
+                    entity: cover.shelly_wohnzimmer_rechts
+                    primary: Rollo WZ Rechts
+                    secondary: |-
+                      {% if is_state('cover.shelly_wohnzimmer_rechts', 'open') %}
+                        Offen │ {{ state_attr('cover.shelly_wohnzimmer_rechts', 'current_position') | default('?') }}%
+                      {% elif is_state('cover.shelly_wohnzimmer_rechts', 'closed') %}
+                        Geschlossen
+                      {% elif is_state('cover.shelly_wohnzimmer_rechts', 'opening') %}
+                        Fährt hoch ▲
+                      {% elif is_state('cover.shelly_wohnzimmer_rechts', 'closing') %}
+                        Fährt runter ▼
+                      {% else %}
+                        {{ states('cover.shelly_wohnzimmer_rechts') }}
+                      {% endif %}
+                    icon: >-
+                      {% if is_state('cover.shelly_wohnzimmer_rechts', 'open') %}
+                        mdi:window-shutter-open
+                      {% elif is_state('cover.shelly_wohnzimmer_rechts', 'opening') or
+                      is_state('cover.shelly_wohnzimmer_rechts', 'closing') %}
+                        mdi:window-shutter-cog
+                      {% else %}
+                        mdi:window-shutter
+                      {% endif %}
+                    icon_color: >-
+                      {% if is_state('cover.shelly_wohnzimmer_rechts', 'open') %}
+                        blue
+                      {% elif is_state('cover.shelly_wohnzimmer_rechts', 'opening') or
+                      is_state('cover.shelly_wohnzimmer_rechts', 'closing') %}
+                        orange
+                      {% else %}
+                        grey
+                      {% endif %}
+                    layout: vertical
+                    tap_action:
+                      action: more-info
+                  - type: custom:mushroom-chips-card
+                    alignment: center
+                    chips:
+                      - type: action
+                        icon: mdi:arrow-up
+                        tap_action:
+                          action: call-service
+                          service: cover.open_cover
+                          target:
+                            entity_id: cover.shelly_wohnzimmer_rechts
+                      - type: action
+                        icon: mdi:stop
+                        tap_action:
+                          action: call-service
+                          service: cover.stop_cover
+                          target:
+                            entity_id: cover.shelly_wohnzimmer_rechts
+                      - type: action
+                        icon: mdi:arrow-down
+                        tap_action:
+                          action: call-service
+                          service: cover.close_cover
+                          target:
+                            entity_id: cover.shelly_wohnzimmer_rechts
+
+          # ─── SEKTION 7: EFFIZIENZ & STATISTIK ───────────────────────────────
+          - type: custom:mushroom-title-card
+            title: Statistik & Evaluation
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_cop
+                primary: COP Aktuell
+                secondary: >-
+                  {% set cop = states('sensor.wp_cop') | float(0) %}
+                  {% if cop > 0 %} {{ cop }}
+                  {% else %} —
+                  {% endif %}
+                icon: mdi:gauge
+                icon_color: |-
+                  {% set cop = states('sensor.wp_cop') | float(0) %}
+                  {% if cop >= 4 %} green
+                  {% elif cop >= 3 %} orange
+                  {% elif cop > 0 %} red
+                  {% else %} grey
+                  {% endif %}
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_cop_heute
+                primary: COP Heute
+                secondary: >-
+                  {% set cop = states('sensor.wp_cop_heute') | float(0) %}
+                  {% if cop > 0 %} {{ cop }}
+                  {% else %} —
+                  {% endif %}
+                icon: mdi:chart-line
+                icon_color: |-
+                  {% set cop = states('sensor.wp_cop_heute') | float(0) %}
+                  {% if cop >= 4 %} green
+                  {% elif cop >= 3 %} orange
+                  {% elif cop > 0 %} red
+                  {% else %} grey
+                  {% endif %}
+
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: custom:mushroom-template-card
+                entity: counter.wp_starts_heute
+                primary: Starts
+                secondary: "{{ states('counter.wp_starts_heute') }}"
+                icon: mdi:restart
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_laufzeit_pro_zyklus
+                primary: Ø Laufzeit
+                secondary: "{{ states('sensor.wp_laufzeit_pro_zyklus') | float(0) | round(0) }} min"
+                icon: mdi:timer-outline
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_taktungsbewertung
+                primary: Bewertung
+                secondary: "{{ states('sensor.wp_taktungsbewertung') }}"
+                icon: mdi:check-decagram
+                icon_color: |-
+                  {% set bew = states('sensor.wp_taktungsbewertung') %}
+                  {% if 'Optimal' in bew %} green
+                  {% elif 'Normal' in bew %} yellow
+                  {% elif 'Beobachten' in bew %} orange
+                  {% elif 'Kritisch' in bew %} red
+                  {% else %} grey
+                  {% endif %}
+
+          # Verbrauch
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_verbrauch_heute
+                primary: WP Heute
+                secondary: "{{ states('sensor.wp_verbrauch_heute') | float(0) | round(2) }} kWh"
+                icon: mdi:hours-24
+                icon_color: teal
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_verbrauch_monat
+                primary: WP Monat
+                secondary: "{{ states('sensor.wp_verbrauch_monat') | float(0) | round(2) }} kWh"
+                icon: mdi:calendar-month
+                icon_color: teal
+              - type: custom:mushroom-template-card
+                entity: sensor.wp_verbrauch_jahr
+                primary: WP Jahr
+                secondary: "{{ states('sensor.wp_verbrauch_jahr') | float(0) | round(2) }} kWh"
+                icon: mdi:calendar
+                icon_color: teal
+
+          # ─── SEKTION 8: FAILSAFE / MODBUS DIAGNOSE ──────────────────────────
+          - type: custom:mushroom-template-card
+            entity: sensor.mitsubishi_wp_fehlercode_gateway_raw
+            primary: "System Diagnose (Modbus)"
+            secondary: >-
+              {% set code = states('sensor.mitsubishi_wp_fehlercode_gateway_raw') | float(0) %}
+              {% if code == 0 %}
+                Alles OK — Modbus verbunden
+              {% else %}
+                FEHLERCODE: {{ code | round(0) }}
+              {% endif %}
+            icon: mdi:server-network
+            icon_color: |-
+              {% if states('sensor.mitsubishi_wp_fehlercode_gateway_raw') | float(0) == 0 %}
+                green
+              {% else %}
+                red
+              {% endif %}

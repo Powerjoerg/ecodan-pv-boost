@@ -8,6 +8,25 @@
 
 template:
   - sensor:
+      # ─── Modbus Rückkanal Diagnose ─────────────────────────
+      - name: "WP Regelabweichung"
+        state: >
+          {% set soll = states('input_number.wp_soll_temperatur') | float(0) %}
+          {% set echo = states('sensor.mitsubishi_wp_solltemperatur_wasserspeicher_tww') | float(0) %}
+          {{ (echo - soll) | round(1) }}
+        unit_of_measurement: "K"
+
+      - name: "WP Rueckkanal Status"
+        state: >
+          {% set abweichung = states('sensor.wp_regelabweichung') | float(0) | abs %}
+          {% if abweichung == 0 %}
+            🟢 Synchron
+          {% elif abweichung <= 2 %}
+            🟡 Leichte Abweichung
+          {% else %}
+            🔴 Drift / asynchron
+          {% endif %}
+
       # ─── Ladewaechter (mit Hysterese) ───────────────────────
       - name: "wp_ladewaechter"
         state: >
@@ -16,7 +35,7 @@ template:
           {% set current_state = states('sensor.wp_ladewaechter') %}
           {% if temp < 40 %}
             True
-          {% elif temp >= target %}
+          {% elif temp >= (target - 0.8) %}
             False
           {% else %}
             {{ current_state | default('False') }}
@@ -29,7 +48,7 @@ template:
         device_class: power
         state_class: measurement
         state: >
-          {{ states('sensor.shellypro3em_e08cfe95cbe0_phase_a_leistung') | float(0) * 3 }}
+          {{ states('sensor.shellypro3em_xxxxxxxxxxxx_phase_a_leistung') | float(0) * 3 }}
 
       # Phase B = Heizstab (3-phasig, 1 Phase gemessen × 3)
       - name: "WP Heizstab Gesamt"
@@ -37,7 +56,7 @@ template:
         device_class: power
         state_class: measurement
         state: >
-          {{ states('sensor.shellypro3em_e08cfe95cbe0_phase_b_leistung') | float(0) * 3 }}
+          {{ states('sensor.shellypro3em_xxxxxxxxxxxx_phase_b_leistung') | float(0) * 3 }}
 
       # Phase C = Innenmodul (1-phasig, direkt)
       - name: "WP Innen Gesamt"
@@ -45,7 +64,7 @@ template:
         device_class: power
         state_class: measurement
         state: >
-          {{ states('sensor.shellypro3em_e08cfe95cbe0_phase_c_leistung') | float(0) }}
+          {{ states('sensor.shellypro3em_xxxxxxxxxxxx_phase_c_leistung') | float(0) }}
 
       # Gesamtverbrauch WP (Summe aller drei)
       - name: "WP Gesamtverbrauch"
@@ -53,9 +72,9 @@ template:
         device_class: power
         state_class: measurement
         state: >
-          {{ (states('sensor.shellypro3em_e08cfe95cbe0_phase_a_leistung') | float(0) * 3)
-           + (states('sensor.shellypro3em_e08cfe95cbe0_phase_b_leistung') | float(0) * 3)
-           + (states('sensor.shellypro3em_e08cfe95cbe0_phase_c_leistung') | float(0)) }}
+          {{ (states('sensor.shellypro3em_xxxxxxxxxxxx_phase_a_leistung') | float(0) * 3)
+           + (states('sensor.shellypro3em_xxxxxxxxxxxx_phase_b_leistung') | float(0) * 3)
+           + (states('sensor.shellypro3em_xxxxxxxxxxxx_phase_c_leistung') | float(0)) }}
 
       # ─── Wärmeleistung aus Modbus-Daten ────────────────────
       - name: "WP Waermeleistung"
@@ -75,7 +94,6 @@ template:
 
       # ─── COP Momentan (behält letzten Wert) ────────────────
       - name: "WP COP"
-        unit_of_measurement: ""
         state: >
           {% set flow = states('sensor.mitsubishi_wp_durchflussmenge') | float(0) %}
           {% set vl = states('sensor.mitsubishi_wp_vorlauftemperatur') | float(0) %}
@@ -89,7 +107,6 @@ template:
 
       # ─── COP Heute (Tageswert) ─────────────────────────────
       - name: "WP COP Heute"
-        unit_of_measurement: ""
         state: >
           {% set waerme = states('sensor.wp_waerme_heute') | float(0) %}
           {% set strom = states('sensor.wp_verbrauch_heute') | float(0) %}

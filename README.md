@@ -44,16 +44,16 @@ Automatische PV-Überschuss-Steuerung für Mitsubishi Ecodan Wärmepumpen mit Ho
 │ PUD-SHWM140YAA  │     │                  │     │ CT1: Außen (×3) │
 │ EHSD-YM9D       │     │  PV-Boost        │     │ CT2: Heizstab(×3│)
 │ FTC6 Controller  │     │  Automationen    │     │ CT3: Innen (×1) │
-└────────┬─────────┘     └──────┬───────────┘     └─────────────────┘
-         │                      │
-         │ Modbus RTU           │
-         │ RS-485               │
-         ▼                      │
-┌─────────────────┐     ┌──────┴───────────┐
-│ Procon A1M      │     │ Waveshare        │
-│ MelcoBEMS MINI  │◀───▶│ USB to RS-485    │
-│ Modbus Adapter  │     │ /dev/ttyUSB0     │
-└─────────────────┘     └──────────────────┘
+└────────┬─────────┘     └───────┬──┬───────┘     └─────────────────┘
+         │                       │  │
+         │ Modbus RTU            │  │ WLAN
+         │ RS-485                │  │
+         ▼                       │  ▼
+┌─────────────────┐     ┌────────┴─────────┐     ┌─────────────────┐
+│ Procon A1M      │     │ Waveshare        │     │ Shelly 1 Mini   │
+│ MelcoBEMS MINI  │◀───▶│ USB to RS-485    │     │ Thermostat IN1  │
+│ Modbus Adapter  │     │ /dev/ttyUSB0     │     │ (Potentialfrei) │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
 ---
@@ -67,6 +67,7 @@ Automatische PV-Überschuss-Steuerung für Mitsubishi Ecodan Wärmepumpen mit Ho
 | **Modbus-Adapter** | Procon MelcoBEMS MINI (A1M) | Modbus RTU über RS-485 (Serial) |
 | **USB-Adapter** | Waveshare USB to RS-485 | Anschluss an Home Assistant |
 | **WP-Verbrauchsmessung** | Shelly Pro 3EM (SPEM-003CEBEU) | 3× CT-Klemmen im Sicherungskasten |
+| **Thermostat-Steuerung** | Shelly 1 Mini Gen3 | Potentialfreier Kontakt an IN1 (Zone 1) zur Heizungssteuerung |
 | **Wechselrichter** | FoxESS H3-Pro-15.0 | Hybrid-Wechselrichter |
 | **Batterie** | FoxESS ESC 2900-2 | 17,28 kWh Speicherkapazität |
 | **PV-Anlage** | — | 14,5 kWp |
@@ -84,6 +85,20 @@ Der Shelly Pro 3EM sitzt im Sicherungskasten und misst den WP-Verbrauch über dr
 
 > **Hinweis:** Die Außeneinheit und der Heizstab sind 3-phasig angeschlossen. Da nur eine Phase gemessen wird, wird der Messwert ×3 genommen. Der Fehler beträgt ca. 10-15%, was für die Automation ausreichend genau ist.
 
+### Shelly 1 Mini Gen3 — Thermostat-Kontakt (IN1)
+
+Der Shelly 1 Mini Gen3 wird an der Wärmepumpen-Platine (FTC6) als Raumthermostat angeschlossen, um die Heizkreisfreigabe zu steuern. Er agiert als "Schalter", der den Heizbetrieb basierend auf der Logik in Home Assistant zulässt oder blockiert.
+
+**1. Anschlüsse am Shelly:**
+- **L / N:** 230V Spannungsversorgung (am besten vom gleichen Sicherungsautomat wie die WP-Steuerung).
+- **O / I:** Potentialfreier Schließer-Kontakt. 
+
+**2. Anschluss an der FTC6 (Steckerbrett TBI.1):**
+- Die Klemmen **O** und **I** des Shellys werden mit den Klemmen **1** und **2** am Anschluss **IN1** (auf dem Klemmblock TBI.1) der Wärmepumpe verbunden.
+- **Funktion:** Wenn der Shelly einschaltet (Relais geschlossen), erkennt die FTC6 einen geschlossenen Kontakt. Dadurch wird der Raumheiz-Betrieb freigegeben.
+
+> **Extrem wichtig:** Hier darf **nur** ein potentialfreier Kontakt (wie der Shelly 1 Mini Gen3 *ohne* PM) verwendet werden. Schließe **keine 230V** an den IN1-Anschluss an, sonst wird das Mainboard der Wärmepumpe zerstört!
+
 ---
 
 ## Voraussetzungen
@@ -92,13 +107,20 @@ Der Shelly Pro 3EM sitzt im Sicherungskasten und misst den WP-Verbrauch über dr
 - HACS installiert (für Mushroom Cards)
 - [Mushroom Cards](https://github.com/piitaya/lovelace-mushroom) installiert
 - Procon A1M korrekt verkabelt (RS-485 → Waveshare → USB → Raspberry Pi)
-- Shelly Pro 3EM in HA integriert
+- Shelly Pro 3EM in HA integriert (für Verbrauchsmessung)
+- Shelly 1 Mini Gen3 in HA integriert (für Heizkreisfreigabe)
 - FoxESS Integration in HA (für PV-Daten und Batterie-SOC)
 - Folgende HA-Sensoren müssen vorhanden sein:
   - `sensor.pv_power` — aktuelle PV-Leistung in **kW**
   - `sensor.battery_soc_1` — Batterie-Ladezustand in **%**
   - `sensor.solar_energy_today` — PV-Erzeugung heute in **kWh**
   - `sensor.feed_in_energy_today` — Einspeisung heute in **kWh**
+- Folgende HA-Zähler (Helfer) müssen unter Settings → Geräte & Dienste → Helfer angelegt werden:
+  - `counter.wp_starts_heute`
+  - `counter.wp_kurzzyklen_heute`
+  - `counter.wp_abtauzyklen_heute` (Neu!)
+- Folgende HA-Entität (Schalter) muss zwingend übereinstimmen:
+  - `switch.wp_thermostat_in_1` — Dies muss die genaue Entitäts-ID des **Shelly 1 Mini Gen3** sein. Bitte in HA entsprechend umbenennen!
 
 ---
 
@@ -184,7 +206,7 @@ Die Template-Sensoren umfassen:
 | `binary_sensor.wp_laeuft` | WP läuft (Frequenz > 5 Hz) |
 | `sensor.wp_laufzeit_heute` | Gesamte Laufzeit heute in Stunden (history_stats) |
 
-> **Wichtig:** Die Entity-IDs der Shelly-Sensoren müssen an dein Gerät angepasst werden! Suche in den Templates nach `shellypro3em_e08cfe95cbe0` und ersetze die MAC-Adresse durch deine eigene.
+> **Wichtig:** Die Entity-IDs der Shelly-Sensoren müssen an dein Gerät angepasst werden! Suche in den Templates nach `shellypro3em_xxxxxxxxxxxx` und ersetze die MAC-Adresse durch deine eigene.
 
 ---
 
@@ -240,10 +262,11 @@ Kopiere den Inhalt von `automations.yaml` aus diesem Repo in deine HA-Datei `con
 
 | Nr | Name | Beschreibung |
 |---|---|---|
-| 1 | WP Taktung - Start zählen | Zählt WP-Starts (Frequenz > 5 Hz für 5 Min — ignoriert Abtauzyklen) |
-| 2 | WP Taktung - Reset Mitternacht | Setzt Counter täglich auf 0 |
-| 3 | **WP Boost aktivieren** | Soll auf 60°C wenn PV > 1 kW, Batterie > 70%, TWW < 48°C |
-| 4 | **WP Boost beenden** | Zurück auf 50°C wenn PV < 0.8 kW, Batterie < 65% oder 21:00 Uhr |
+| 1 | WP Taktung - Start zählen | Zählt WP-Starts (Frequenz > 5 Hz für 1 Min) |
+| 2 | WP Taktung - Reset Mitternacht | Setzt Start- und Abtau-Counter täglich auf 0 |
+| 3 | WP Taktung - Abtauzyklus zählen & Filtern | Erkennt Abtauung, filtert den Takt heraus und erhöht Abtau-Zähler |
+| 4 | **WP Boost aktivieren** | Soll auf 60°C wenn PV > 1 kW, Batterie > 70%, TWW < 48°C |
+| 5 | **WP Boost beenden** | Zurück auf 50°C wenn PV < 0.8 kW, Batterie < 65% oder 21:00 Uhr |
 | 5 | **WP Boost Ziel erreicht** | Zurück auf 50°C wenn Speicher 59°C erreicht |
 | 6 | WP Soll manuell setzen | Schreibt Soll-Temperatur wenn Slider im Dashboard geändert wird |
 
@@ -288,11 +311,14 @@ Die Hysterese bestimmt, wie weit die Temperatur fallen darf, bevor die WP wieder
 * **Verdichter-Stillstandszeit (Mindestpause):** Auf z. B. `10 Min` bis `20 Min` erhöhen.
 * *Hintergrund:* Ein sofortiges Wiederanspringen nach dem Abschalten (z. B. durch kleine Temperatur-Schwankungen) wird physikalisch von der FTC6-Steuerung blockiert. Das schont den Verdichter enorm.
 
-### 4. Einsatzgrenzen (AT-Bivalenzpunkt / Heizgrenze)
-* **Heizgrenztemperatur (Sommerabschaltung):** z. B. bei `+15°C` Außentemperatur.
-* *Hintergrund:* Bei übertrieben milden Temperaturen draußen kann die WP ihre Minimalleistung ohnehin nicht mehr richtig ans Heizwasser abgeben und taktet zwingend. Ab dieser Außentemperatur wird der Heizbetrieb daher komplett gesperrt und die WP macht nur noch Warmwasser.
+### 4. Einsatzgrenzen (AT-Bivalenzpunkt / Sommerabschaltung)
+* **Umschaltung Sommerbetrieb:** Zwingend auf `Außentemperatur` (o.ä.) stellen, **nicht** auf `Keine`! Steht der Wert auf `Keine`, ist die Sommerabschaltung komplett deaktiviert und die wp-interne Heizkurve versucht das ganze Jahr stur zu heizen.
+* **Außentemperatur Heizen EIN:** z. B. `11°C` bis `14°C`.
+* **Außentemperatur Heizen AUS:** z. B. `13°C` bis `15°C`.
+* **Dämpfungszeit Außentemp.:** auf z.B. `6h` (Standard) belassen. Verhindert, dass die WP bei kurzen sonnigen Abschnitten sofort springt, sondern immer den gleitenden Durchschnitt nutzt.
+* *Hintergrund:* Bei milden Außentemperaturen im Frühling/Herbst (z.B. 19°C) und plötzlicher Sonneneinstrahlung schließen intelligente Einzelraumregler (ERR) oft die Kreise. Ist die Sommerabschaltung an der FTC6 deaktiviert (`Keine`), pumpt die WP autonom voll gegen diese geschlossenen Kreise. Die Folge: Spreizung 0.0°C, 2-Minuten-Kurzzyklus (Hydraulischer Kurzschluss) und extremer Verschleiß! Die korrekte Anpassung der Sommerabschaltung ist der wichtigste Hebel gegen das Takten im milden Frühjahr.
 
-> **Achtung:** Die ganz exakten Werte können je nach Gebäudedämmung und Flächenheizung leicht variieren. Diese Optionen (Vorrang, Hysterese, Sperrzeiten, Einsatzgrenzen) haben sich aber als die entscheidenden Hebel im FTC6-Menü erwiesen, um die Start-Zyklen der Ecodan signifikant in den Griff zu bekommen!
+> **Achtung:** Die ganz exakten Werte können je nach Gebäudedämmung und Flächenheizung leicht variieren. Diese Optionen (Vorrang, Hysterese, Sperrzeiten, Sommerabschaltung) haben sich aber als die entscheidenden Hebel im FTC6-Menü erwiesen, um die Start-Zyklen der Ecodan signifikant in den Griff zu bekommen!
 
 ---
 
@@ -317,11 +343,11 @@ Die Hysterese bestimmt, wie weit die Temperatur fallen darf, bevor die WP wieder
 
 | Schalter | Stellung | Funktion |
 |---|---|---|
-| SW2-1 | **ON** | Externer Thermostat an IN1 (Zone 1) — nur setzen wenn Shelly angeschlossen! |
+| SW2-1 | **ON** | Externer Thermostat an IN1 (Zone 1) — **Zwingend erforderlich für Shelly Steuerung!** |
 | SW2-2 bis SW2-7 | OFF | — |
 | SW2-8 | **ON** | Strömungswächter aktiv |
 
-> **Wichtig:** SW2-1 nur auf ON setzen, wenn ein potentialfreier Kontakt (z.B. Shelly 1PM Mini Gen3) an IN1 auf TBI.1 angeschlossen ist! Ohne angeschlossenen Kontakt interpretiert die FTC "offener Kontakt" als "kein Heizbedarf" und die Heizung für Zone 1 stoppt.
+> **Wichtig:** Da in diesem Konstrukt der **Shelly 1 Mini Gen3** zwingend erforderlich ist, MUSS `SW2-1` auf **ON** stehen! (Hintergrund: Ohne den angeschlossenen Shelly würde die FTC den "offenen Kontakt" an IN1 als "kein Heizbedarf" interpretieren und die Heizung würde dauerhaft stoppen).
 
 #### Procon A1M
 
@@ -447,7 +473,7 @@ Die Taktungsbewertung analysiert die WP-Laufmuster und gibt eine Gesamtnote:
 | 5–8 | < 15 min | 🟠 Beobachten |
 | 9+ | egal | 🔴 Kritisch |
 
-> **Hinweis:** Abtauzyklen (kurze Stopps < 5 Min) werden durch den `for: 5 minutes` Trigger in der Taktungs-Automation herausgefiltert und nicht als Start gezählt.
+> **Hinweis:** Da ein Abtaubetrieb die Wärmepumpe physikalisch stoppt und neu anfährt, würde dies normalerweise als "Taktung" gezählt werden. Unsere Automation *WP Taktung - Abtauzyklus zählen & Filtern* greift hier jedoch smart ein: Sie erhöht den neuen `Abtauzyklen`-Zähler und zieht exakt in dem Moment `-1` vom `Starts`-Zähler ab. Wenn die WP nach dem Abtauen also wieder anläuft (+1 Start), hebt sich das physikalisch auf. Damit hast du eine zu 100 % bereinigte "Starts/Tag" Statistik, die nur echte Takte zählt!
 
 ---
 
@@ -515,7 +541,7 @@ Aussagekräftiger als der Momentanwert, da er Anlauf- und Abtauphasen mittelt.
 ## Danksagung
 
 - **[helgeklein](https://github.com/helgeklein/mitsubishi-heat-pump-modbus-home-assistant)** — Für das hervorragende Modbus-Package für Mitsubishi Wärmepumpen. Dieses Projekt baut darauf auf und erweitert es um PV-Boost Funktionalität.
-- **Anthropic Claude** — KI-gestützte Entwicklung und Konfiguration
+- **Anthropic Claude** & **Google Antigravity Gemini 3.1 Pro** — Intensive KI-gestützte Fehleranalyse, Code-Optimierung und Refactoring in v2
 
 ---
 

@@ -41,6 +41,15 @@ modbus:
 
     sensors:
 
+      # EN: Fault Code
+      # DE: Fehlercode Gateway (Z.B. 6999 bedeutet Kommunikationsverlust)
+      - name: "Mitsubishi WP: Fehlercode Gateway (raw)"
+        address: 8
+        data_type: uint16
+        scan_interval: 60
+        input_type: holding
+        unique_id: mitsubishi_wp_fehlercode_gateway_raw
+
       # EN: Operating mode
       # DE: Betriebsart
       - name: "Mitsubishi WP: Betriebsart (raw)"
@@ -71,7 +80,7 @@ modbus:
       # EN: Set tank water temperature
       # DE: Solltemperatur Wasserspeicher
       - name: "Mitsubishi WP: Solltemperatur Wasserspeicher (TWW)"
-        address: 31
+        address: 30
         data_type: uint16
         scale: 0.01
         precision: 1
@@ -320,29 +329,6 @@ modbus:
         state_class: measurement
         unique_id: mitsubishi_wp_durchflussmenge
 
-      # EN: Consumed power
-      # DE: Verbrauchte Leistung
-      - name: "Mitsubishi WP: Verbrauchte Leistung"
-        address: 379
-        data_type: uint16
-        scan_interval: 60
-        input_type: holding
-        unit_of_measurement: "kW"
-        device_class: power
-        state_class: measurement
-        unique_id: mitsubishi_wp_verbrauchte_leistung
-
-      # EN: Produced power
-      # DE: Erzeugte Leistung
-      - name: "Mitsubishi WP: Erzeugte Leistung"
-        address: 380
-        data_type: uint16
-        scan_interval: 60
-        input_type: holding
-        unit_of_measurement: "kW"
-        device_class: power
-        state_class: measurement
-        unique_id: mitsubishi_wp_erzeugte_leistung
 
       # EN: Mix tank water temp
       # DE: Temperatur Mischwasserspeicher
@@ -502,18 +488,4 @@ template:
           {% set wh = states('sensor.mitsubishi_wp_zuletzt_gemessene_erzeugte_warmwasserenergie_wh_anteil') | float(0) %}
           {{ (kwh + (wh / 1000)) | round(2) }}
 
-      # EN: COP (instantaneous) - from internal WP power registers
-      # DE: Leistungszahl (momentan) - aus internen WP-Leistungsregistern
-      - name: "Mitsubishi WP: COP"
-        unique_id: mitsubishi_wp_cop
-        state_class: measurement
-        availability: >-
-          {% set p_in = states('sensor.mitsubishi_wp_verbrauchte_leistung') %}
-          {% set p_out = states('sensor.mitsubishi_wp_erzeugte_leistung') %}
-          {{ p_in not in ['unknown', 'unavailable', 'none']
-             and p_out not in ['unknown', 'unavailable', 'none']
-             and (p_in | float(0)) > 0 }}
-        state: >-
-          {% set p_in = states('sensor.mitsubishi_wp_verbrauchte_leistung') | float(0) %}
-          {% set p_out = states('sensor.mitsubishi_wp_erzeugte_leistung') | float(0) %}
-          {{ (p_out / p_in) | round(2) }}
+
